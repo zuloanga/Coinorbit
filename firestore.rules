@@ -1,0 +1,249 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate timestamp field
+    function isValidDate(dateField) {
+      return dateField is timestamp;
+    }
+
+    // Validate amount
+    function isValidAmount(amount) {
+      return amount is number && amount >= 0;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() 
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+          'uid', 'email', 'fullName', 'createdAt', 'lastLogin', 
+          'referralCode', 'referralCount', 'balance'
+        ]);
+      allow update: if (isOwner(userId) && 
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['lastLogin', 'fullName', 'email', 'balance'])) || 
+        (isAdmin() && 
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['balance', 'status', 'referralCount']));
+      allow delete: if isAdmin();
+
+      // Transactions Subcollection - Updated to handle approval flow
+      match /transactions/{transactionId} {
+        // Allow admins to read all transactions
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && 
+          request.resource.data.keys().hasAll(['amount', 'type', 'timestamp', 'status']) &&
+          request.resource.data.type in ['deposit', 'withdraw', 'investment'] &&
+          isValidAmount(request.resource.data.amount) &&
+          isValidDate(request.resource.data.timestamp);
+        // Only admins can update transaction status
+        allow update: if isAdmin() && 
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['status', 'processedAt', 'processedBy', 'rejectionReason']);
+        allow delete: if false; // Transactions should not be deleted
+      }
+      
+      // Investments Subcollection
+      match /investments/{investmentId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && 
+          request.resource.data.keys().hasAll([
+            'planId', 'amount', 'expectedReturn', 'roi', 'status',
+            'investmentDate', 'maturityDate', 'payoutStatus', 'reinvestment'
+          ]) &&
+          request.resource.data.status == 'active' &&
+          request.resource.data.payoutStatus == 'pending' &&
+          isValidAmount(request.resource.data.amount) &&
+          isValidDate(request.resource.data.investmentDate) &&
+          isValidDate(request.resource.data.maturityDate);
+        allow update: if isAdmin() && 
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['status', 'payoutStatus', 'processedAt', 'processedBy']);
+        allow delete: if false; // Investments should not be deleted
+      }
+      
+      // Referrals Subcollection
+      match /referrals/{referralId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAdmin();
+      }
+      
+      // Notifications Subcollection
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow create: if isAdmin();
+        allow update: if isOwner(userId) && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Admin Collection
+    match /admins/{adminId} {
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == adminId);
+      allow create: if isAuthenticated() 
+        && request.resource.data.keys().hasAll(['uid', 'email', 'fullName', 'role', 'createdAt', 'lastLogin'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'admin';
+      allow update: if isAdmin() 
+        && request.auth.uid == adminId
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['lastLogin', 'fullName']);
+      allow delete: if false;
+      
+      // Admin Activity Logs
+      match /activityLogs/{logId} {
+        allow read: if isAdmin();
+        allow create: if isAdmin();
+        allow update, delete: if false; // Logs should be immutable
+      }
+    }
+
+    // Explicitly allow admins to query transactions across all users
+    match /{path=**}/transactions/{transactionId} {
+      allow read: if isAdmin();
+    }
+    
+    // Explicitly allow admins to query investments across all users
+    match /{path=**}/investments/{investmentId} {
+      allow read: if isAdmin();
+    }
+
+    // Transactions Collection (if you decide to keep a separate collection)
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && 
+        request.resource.data.keys().hasAll([
+          'userId', 'type', 'amount', 'currency', 'status', 
+          'timestamp'
+        ]) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        isValidAmount(request.resource.data.amount) &&
+        isValidDate(request.resource.data.timestamp);
+      allow update: if isAdmin() && 
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'processedAt', 'processedBy', 'rejectionReason']);
+      allow delete: if isAdmin();
+    }
+
+    // Investments Collection (global collection if needed)
+    match /investments/{investmentId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && 
+        request.resource.data.keys().hasAll([
+          'userId', 'planId', 'amount', 'status',
+          'startDate', 'endDate', 'profit'
+        ]) &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidAmount(request.resource.data.amount) &&
+        isValidDate(request.resource.data.startDate) &&
+        isValidDate(request.resource.data.endDate);
+      allow update: if isAdmin() && 
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'profit', 'lastProfitUpdate']);
+      allow delete: if isAdmin();
+    }
+
+    // Investment Plans Collection
+    match /investmentPlans/{planId} {
+      allow read: if true; // Anyone can read investment plans
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Withdrawals Collection
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && 
+        request.resource.data.keys().hasAll([
+          'userId', 'amount', 'currency', 'status', 
+          'requestDate', 'walletAddress'
+        ]) &&
+        request.resource.data.userId == request.auth.uid &&
+        isValidAmount(request.resource.data.amount) &&
+        isValidDate(request.resource.data.requestDate) &&
+        request.resource.data.status == 'pending';
+      allow update: if isAdmin() && 
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'processedDate', 'processedBy', 'rejectionReason']);
+      allow delete: if isAdmin();
+    }
+
+    // Deposits Collection
+    match /deposits/{depositId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && 
+        request.resource.data.keys().hasAll([
+          'userId', 'amount', 'currency', 'status', 
+          'createdAt', 'txHash'
+        ]) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        isValidAmount(request.resource.data.amount) &&
+        isValidDate(request.resource.data.createdAt);
+      allow update: if isAdmin() && 
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'verifiedAt', 'verifiedBy', 'rejectionReason']);
+      allow delete: if isAdmin();
+    }
+    
+    // System Settings Collection
+    match /settings/{settingId} {
+      allow read: if true; // Public settings can be read by anyone
+      allow write: if isAdmin();
+    }
+    
+    // Payment Methods Collection
+    match /paymentMethods/{methodId} {
+      allow read: if true; // Payment methods are public
+      allow write: if isAdmin();
+    }
+    
+    // FAQ Collection
+    match /faq/{faqId} {
+      allow read: if true; // FAQs are public
+      allow write: if isAdmin();
+    }
+    
+    // Testimonials Collection
+    match /testimonials/{testimonialId} {
+      allow read: if true; // Testimonials are public
+      allow create: if isAuthenticated(); // Authenticated users can create testimonials
+      allow update, delete: if isAdmin(); // Only admins can update or delete
+    }
+    
+    // Audit Logs Collection
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // System can create logs for any authenticated user
+      allow update, delete: if false; // Logs should be immutable
+    }
+
+    // Catch-all rule - deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
