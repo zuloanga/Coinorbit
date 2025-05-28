@@ -23,4 +23,3 @@ export function Loader({ size = "medium" }: LoaderProps) {
     </div>
   )
 }
-

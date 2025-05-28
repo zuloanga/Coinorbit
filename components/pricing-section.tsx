@@ -283,4 +283,3 @@ export function PricingSection() {
     </motion.div>
   )
 }
-

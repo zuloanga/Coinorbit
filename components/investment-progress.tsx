@@ -107,4 +107,3 @@ export function InvestmentProgress({ userId, investments }: InvestmentProgressPr
     </div>
   )
 }
-

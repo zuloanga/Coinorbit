@@ -143,4 +143,3 @@ export function HeroSection() {
     </motion.div>
   )
 }
-

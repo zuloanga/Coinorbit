@@ -376,4 +376,3 @@ export const getUserInvestments = async (userId: string) => {
     return []
   }
 }
-

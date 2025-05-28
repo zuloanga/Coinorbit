@@ -23,4 +23,3 @@ export function Footer() {
     </motion.footer>
   )
 }
-

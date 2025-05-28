@@ -228,4 +228,3 @@ export const getRemainingTime = (endDate: Date): string => {
   }
   return `${hours}h remaining`
 }
-

@@ -71,4 +71,3 @@ export function ProcessSection() {
     </motion.div>
   )
 }
-

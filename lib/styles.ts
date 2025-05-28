@@ -19,4 +19,3 @@ export const inputStyles = {
     placeholder-white/30 focus:outline-none focus:border-blue-500/50
     focus:ring-2 focus:ring-blue-500/20`,
 }
-

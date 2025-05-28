@@ -100,4 +100,3 @@ export function InvestmentCard({ totalInvestment, totalProfit }: InvestmentCardP
     </div>
   )
 }
-

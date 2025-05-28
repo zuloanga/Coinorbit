@@ -651,4 +651,3 @@ export const processInvestmentPayout = async (userId: string, investmentId: stri
     throw error
   }
 }
-
