@@ -46,7 +46,7 @@ export function PricingSection() {
       id: "starter_plan",
       name: "Starter Plan",
       description: "Perfect for beginners looking to start their investment journey",
-      minAmount: 500,
+      minAmount: 100,
       roi: 5,
       duration: 7,
       features: ["5% ROI in 7 days", "Minimum deposit: $500", "24/7 Support", "Basic AI analysis", "Weekly reports"],
@@ -55,7 +55,7 @@ export function PricingSection() {
       id: "growth_plan",
       name: "Growth Plan",
       description: "Designed for investors seeking steady growth and higher returns",
-      minAmount: 2500,
+      minAmount: 500,
       roi: 15,
       duration: 14,
       features: [
@@ -72,7 +72,7 @@ export function PricingSection() {
       id: "premium_plan",
       name: "Premium Plan",
       description: "Our highest tier for serious investors seeking maximum returns",
-      minAmount: 10000,
+      minAmount: 2500,
       roi: 30,
       duration: 30,
       features: [
