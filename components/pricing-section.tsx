@@ -55,12 +55,12 @@ export function PricingSection() {
       id: "growth_plan",
       name: "Growth Plan",
       description: "Designed for investors seeking steady growth and higher returns",
-      minAmount: 500,
+      minAmount: 100,
       roi: 15,
       duration: 14,
       features: [
         "15% ROI in 14 days",
-        "Minimum deposit: $2,500",
+        "Minimum deposit: $500",
         "Priority support",
         "Advanced AI analysis",
         "Daily reports",
@@ -77,7 +77,7 @@ export function PricingSection() {
       duration: 30,
       features: [
         "30% ROI in 30 days",
-        "Minimum deposit: $10,000",
+        "Minimum deposit: $2500",
         "VIP support",
         "Premium AI analysis",
         "Real-time reports",
